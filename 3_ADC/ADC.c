@@ -23,7 +23,7 @@ void main(void)
     IFR = 0x0000;
     InitPieVectTable();
 
-    // === Configuración SCI-A ===
+    // === Configuración SCI-A ====
     InitSciaGpio();
     InitScia();
     scia_msg("Inicio del programa con interrupciones...\r\n");
