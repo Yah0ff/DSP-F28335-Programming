@@ -1,16 +1,19 @@
 /************************************************************
- * F28335 - CAN-A 4 NODES with 3 buttons and 3 LEDs per node
+ * F28335 - CAN-A 4 NODOS con 3 botones y 3 LEDs por nodo
+ * - Cada nodo: 3 botones, 3 LEDs
+ * - BROADCAST: Todos reciben en ID 0x100
+ * - Payload: BYTE0 = DESTINO usuario, BYTE1 = LED a togglear
  ************************************************************/
 #include "DSP2833x_Device.h"
 #include "DSP2833x_Examples.h"
 
-/*===================== CONFIGURE YOUR NODE HERE =====================*/
-#define NODE_ID  (3u)   /* CHANGE to 1, 2, 3 or 4 depending on DSP */
+/*===================== CONFIGURA TU NODE AQUÍ =====================*/
+#define NODE_ID  (3u)   /* CAMBIA a 1, 2, 3 o 4 según el DSP */
 
-/*===================== UNIQUE ID for all nodes =======================*/
-#define BROADCAST_ID  (0x100u)  /* All nodes use this same ID */
+/*===================== ID ÚNICO para todos ========================*/
+#define BROADCAST_ID  (0x100u)  /* TODOS usan este mismo ID */
 
-/*===================== GPIO LEDS (3 LEDs per node) ===============*/
+/*===================== GPIO LEDS (3 LEDs por nodo) ===============*/
 /* GPIO24 = LED1, GPIO25 = LED2, GPIO26 = LED3 */
 #define LEDS_INIT()      do{ EALLOW; \
                                GpioCtrlRegs.GPAMUX2.bit.GPIO24 = 0; \
@@ -26,7 +29,7 @@
 #define LED2_TOGGLE()    do{ GpioDataRegs.GPATOGGLE.bit.GPIO25 = 1; }while(0)
 #define LED3_TOGGLE()    do{ GpioDataRegs.GPATOGGLE.bit.GPIO26 = 1; }while(0)
 
-/*===================== GPIO BUTTONS (3 buttons) ==================*/
+/*===================== GPIO BOTONES (3 botones) ==================*/
 /* GPIO12 = BTN1, GPIO13 = BTN2, GPIO14 = BTN3 */
 #define BTNS_INIT()      do{ EALLOW; \
                                /* BTN1 - GPIO12 */ \
@@ -50,47 +53,49 @@
 #define BTN2_IS_PRESSED()   (GpioDataRegs.GPADAT.bit.GPIO13 == 0)
 #define BTN3_IS_PRESSED()   (GpioDataRegs.GPADAT.bit.GPIO14 == 0)
 
-/*===================== Mapping according to specification ================*/
+/*===================== Mapeo según especificación ================*/
 /*
- * User1 BTN1  LED1 user2 (DEST=2, LED=1)
- * User1 BTN2  LED1 user3 (DEST=3, LED=1)
- * User1 BTN3  LED1 user4 (DEST=4, LED=1)
+ * Especificación:
+ * Usuario1 BTN1  LED1 usuario2 (DEST=2, LED=1)
+ * Usuario1 BTN2  LED1 usuario3 (DEST=3, LED=1)
+ * Usuario1 BTN3  LED1 usuario4 (DEST=4, LED=1)
  *
- * User2 BTN1 LED1 user1 (DEST=1, LED=1)
- * User2 BTN2  LED2 user3 (DEST=3, LED=2)
- * User2 BTN3  LED2 user4 (DEST=4, LED=2)
+ * Usuario2 BTN1 LED1 usuario1 (DEST=1, LED=1)
+ * Usuario2 BTN2  LED2 usuario3 (DEST=3, LED=2)
+ * Usuario2 BTN3  LED2 usuario4 (DEST=4, LED=2)
  *
- * User3 BTN1  LED2 user1 (DEST=1, LED=2)
- * User3 BTN2  LED2 user2 (DEST=2, LED=2)
- * User3 BTN3  LED3 user4 (DEST=4, LED=3)
+ * Usuario3 BTN1  LED2 usuario1 (DEST=1, LED=2)
+ * Usuario3 BTN2  LED2 usuario2 (DEST=2, LED=2)
+ * Usuario3 BTN3  LED3 usuario4 (DEST=4, LED=3)
  *
- * User4 BTN1  LED3 user1 (DEST=1, LED=3)
- * User4 BTN2  LED3 user2 (DEST=2, LED=3)
- * User4 BTN3  LED3 user3 (DEST=3, LED=3)
+ * Usuario4 BTN1  LED3 usuario1 (DEST=1, LED=3)
+ * Usuario4 BTN2  LED3 usuario2 (DEST=2, LED=3)
+ * Usuario4 BTN3  LED3 usuario3 (DEST=3, LED=3)
  */
 
+/* Retorna destino y LED para cada botón según NODE_ID */
 static inline void get_btn1_params(Uint16 *dest, Uint16 *led) {
     if (NODE_ID == 1) { *dest = 2; *led = 1; }
     else if (NODE_ID == 2) { *dest = 1; *led = 1; }
     else if (NODE_ID == 3) { *dest = 1; *led = 2; }
-    else { *dest = 1; *led = 3; }
+    else { *dest = 1; *led = 3; }  /* NODE_ID == 4 */
 }
 
 static inline void get_btn2_params(Uint16 *dest, Uint16 *led) {
     if (NODE_ID == 1) { *dest = 3; *led = 1; }
     else if (NODE_ID == 2) { *dest = 3; *led = 2; }
     else if (NODE_ID == 3) { *dest = 2; *led = 2; }
-    else { *dest = 2; *led = 3; }
+    else { *dest = 2; *led = 3; }  /* NODE_ID == 4 */
 }
 
 static inline void get_btn3_params(Uint16 *dest, Uint16 *led) {
     if (NODE_ID == 1) { *dest = 4; *led = 1; }
     else if (NODE_ID == 2) { *dest = 4; *led = 2; }
     else if (NODE_ID == 3) { *dest = 4; *led = 3; }
-    else { *dest = 3; *led = 3; }
+    else { *dest = 3; *led = 3; }  /* NODE_ID == 4 */
 }
 
-/*===================== Prototypes ================================*/
+/*===================== Prototipos ================================*/
 static void init_system(void);
 static void cana_basic_init(void);
 static void cana_setup_mailboxes(void);
@@ -105,25 +110,32 @@ volatile Uint32 g_rxCount = 0;
 /*===================== MAIN =====================================*/
 void main(void)
 {
+    /* Estados botones */
     Uint16 s1 = 0, s2 = 0, s3 = 0;
     Uint16 b1_prev = 1, b2_prev = 1, b3_prev = 1;
 
+    /* Inicialización */
     init_system();
     InitECanGpio();
     cana_basic_init();
     cana_setup_mailboxes();
 
+    /* Inicializar LEDs */
     LEDS_INIT();
+
+    /* Inicializar botones */
     BTNS_INIT();
 
+    /* Loop principal */
     for (;;)
     {
-        /* Reception */
+        /* 1) RECEPCIÓN BROADCAST */
         if (ECanaRegs.CANRMP.bit.RMP1 == 1) {
             volatile struct MBOX *mbx = &ECanaMboxes.MBOX1;
             Uint16 dest = (Uint16)mbx->MDL.byte.BYTE0;
             Uint16 led_num = (Uint16)mbx->MDL.byte.BYTE1;
 
+            /* Solo actuar si el mensaje es para MÍ */
             if (dest == NODE_ID) {
                 if (led_num == 1) {
                     LED1_TOGGLE();
@@ -135,10 +147,11 @@ void main(void)
                 g_rxCount++;
             }
 
+            /* Limpiar flag de recepción */
             ECanaRegs.CANRMP.all = (1UL<<1);
         }
 
-        /* Button 1 */
+        /* 2) BOTÓN 1 */
         {
             Uint16 b1_now = (Uint16)BTN1_IS_PRESSED();
             if (s1 == 0) {
@@ -159,7 +172,7 @@ void main(void)
             b1_prev = b1_now;
         }
 
-        /* Button 2 */
+        /* 3) BOTÓN 2 */
         {
             Uint16 b2_now = (Uint16)BTN2_IS_PRESSED();
             if (s2 == 0) {
@@ -180,7 +193,7 @@ void main(void)
             b2_prev = b2_now;
         }
 
-        /* Button 3 */
+        /* 4) BOTÓN 3 */
         {
             Uint16 b3_now = (Uint16)BTN3_IS_PRESSED();
             if (s3 == 0) {
@@ -203,29 +216,33 @@ void main(void)
     }
 }
 
-/*===================== Send message function ===============*/
+/*===================== Función para enviar mensaje ===============*/
 static void can_send_message(Uint16 dest, Uint16 led_num)
 {
     struct ECAN_REGS sh;
 
+    /* Configurar payload */
     ECanaMboxes.MBOX0.MDL.byte.BYTE0 = (Uint16)dest;
     ECanaMboxes.MBOX0.MDL.byte.BYTE1 = (Uint16)led_num;
     ECanaMboxes.MBOX0.MSGCTRL.bit.DLC = 2;
 
+    /* Disparar transmisión */
     sh.CANTRS.all = 0;
     sh.CANTRS.bit.TRS0 = 1;
     ECanaRegs.CANTRS.all = sh.CANTRS.all;
 
+    /* Esperar fin de transmisión */
     do {
         sh.CANTA.all = ECanaRegs.CANTA.all;
     } while (sh.CANTA.bit.TA0 == 0);
 
+    /* Limpiar flag */
     sh.CANTA.all = 0;
     sh.CANTA.bit.TA0 = 1;
     ECanaRegs.CANTA.all = sh.CANTA.all;
 }
 
-/*===================== Initializations ==========================*/
+/*===================== Inicializaciones ==========================*/
 static void init_system(void)
 {
     InitSysCtrl();
@@ -277,6 +294,6 @@ static void cana_setup_mailboxes(void)
     ECanaRegs.CANGIF1.all = 0xFFFFFFFF;
 }
 
-/*===================== Debouncing ===============================*/
+/*===================== Antirrebote ===============================*/
 static void debounce_press(void)   { DELAY_US(10000); }
 static void debounce_release(void) { DELAY_US(2000);  }

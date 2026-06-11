@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<?ccsproject version="1.0"?>
+<projectOptions>
+	<deviceFamily value="C2000"/>
+	<isTargetManual value="true"/>
+	<origin value="C:/ti/c2000/C2000Ware_6_00_00_00/device_support/f2833x/examples/ecan_a_to_b_xmit"/>
+</projectOptions>
