@@ -28,7 +28,7 @@
 
 
 
-//On/off by timing and interruptions----------------------------------------------------------------------
+//On/off by timing and interruptions-----------------------------------------------------------------------
 
 __interrupt void cpu_timer0_isr(void);
 
